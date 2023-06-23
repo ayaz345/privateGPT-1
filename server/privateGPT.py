@@ -55,12 +55,11 @@ class MyElmLoader(UnstructuredEmailLoader):
             try:
                 doc = UnstructuredEmailLoader.load(self)
             except ValueError as e:
-                if 'text/html content not found in email' in str(e):
-                    # Try plain text
-                    self.unstructured_kwargs["content_source"]="text/plain"
-                    doc = UnstructuredEmailLoader.load(self)
-                else:
+                if 'text/html content not found in email' not in str(e):
                     raise
+                # Try plain text
+                self.unstructured_kwargs["content_source"]="text/plain"
+                doc = UnstructuredEmailLoader.load(self)
         except Exception as e:
             # Add file_path to exception message
             raise type(e)(f"{self.file_path}: {e}") from e
@@ -139,17 +138,14 @@ def get_answer():
     embeddings = HuggingFaceEmbeddings(model_name=embeddings_model_name)
     db = Chroma(persist_directory=persist_directory, embedding_function=embeddings, client_settings=CHROMA_SETTINGS)
     retriever = db.as_retriever()
-    if llm==None:
-        return "Model not downloaded", 400    
+    if llm is None:
+        return "Model not downloaded", 400
     qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever, return_source_documents=True)
-    if query!=None and query!="":
+    if query not in [None, ""]:
         res = qa(query)
         answer, docs = res['result'], res['source_documents']
-        
-        source_data =[]
-        for document in docs:
-             source_data.append({"name":document.metadata["source"]})
 
+        source_data = [{"name":document.metadata["source"]} for document in docs]
         return jsonify(query=query,answer=answer,source=source_data)
 
     return "Empty Query",400
